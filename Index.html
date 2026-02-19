@@ -1,0 +1,1510 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DAO Voting System</title>
+  <style>
+    :root {
+      --bg-1: #f7f2e8;
+      --bg-2: #d8ebff;
+      --ink: #1f2430;
+      --muted: #4d5b74;
+      --card: rgba(255, 255, 255, 0.84);
+      --line: rgba(24, 36, 58, 0.14);
+      --accent: #d4552d;
+      --accent-2: #0f8a8d;
+      --ok: #1f7a38;
+      --no: #b42318;
+      --shadow: 0 16px 42px rgba(16, 26, 42, 0.14);
+      --radius: 16px;
+      --mono: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+      --sans: "Avenir Next", "Segoe UI", "Trebuchet MS", sans-serif;
+      --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 700px at 92% 8%, rgba(11, 139, 141, 0.24), transparent 60%),
+        radial-gradient(1000px 700px at 8% 10%, rgba(212, 85, 45, 0.2), transparent 62%),
+        linear-gradient(135deg, var(--bg-1), var(--bg-2));
+      animation: pageIn 700ms ease-out both;
+    }
+
+    .shell {
+      width: min(1200px, 100% - 2rem);
+      margin: 1.2rem auto 2rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(120deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.64));
+      box-shadow: var(--shadow);
+      padding: 1.15rem 1.2rem;
+      backdrop-filter: blur(2px);
+    }
+
+    h1 {
+      margin: 0;
+      font-family: var(--serif);
+      letter-spacing: 0.02em;
+      font-size: clamp(1.45rem, 4vw, 2.35rem);
+      line-height: 1.2;
+    }
+
+    .sub {
+      margin: 0.35rem 0 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    .grid {
+      margin-top: 1rem;
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      gap: 0.95rem;
+      align-items: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--card);
+      box-shadow: var(--shadow);
+      padding: 0.95rem;
+      animation: rise 680ms cubic-bezier(.18, .8, .25, 1) both;
+    }
+
+    .delay-1 { animation-delay: 90ms; }
+    .delay-2 { animation-delay: 150ms; }
+    .delay-3 { animation-delay: 210ms; }
+
+    .panel h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1.05rem;
+      letter-spacing: 0.01em;
+    }
+
+    .meta {
+      display: grid;
+      gap: 0.45rem;
+      margin-bottom: 0.8rem;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.42rem;
+      margin-top: 0.5rem;
+    }
+
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 0.25rem 0.58rem;
+      font-size: 0.78rem;
+      background: rgba(255, 255, 255, 0.7);
+      color: #27364d;
+      white-space: nowrap;
+    }
+
+    .pill.ok { border-color: rgba(31, 122, 56, 0.35); color: var(--ok); }
+    .pill.no { border-color: rgba(180, 35, 24, 0.35); color: var(--no); }
+
+    .hero-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.7rem;
+    }
+
+    .hero-link {
+      display: inline-block;
+      border: 1px solid rgba(22, 36, 58, 0.2);
+      border-radius: 999px;
+      padding: 0.3rem 0.62rem;
+      font-size: 0.79rem;
+      color: #17304d;
+      text-decoration: none;
+      background: rgba(255, 255, 255, 0.74);
+      transition: transform 120ms ease, background 120ms ease;
+    }
+
+    .hero-link:hover {
+      transform: translateY(-1px);
+      background: rgba(255, 255, 255, 0.95);
+    }
+
+    .overview {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(100px, 1fr));
+      gap: 0.48rem;
+      margin-top: 0.85rem;
+    }
+
+    .overview-card {
+      border: 1px solid rgba(22, 36, 58, 0.17);
+      border-radius: 12px;
+      padding: 0.46rem 0.56rem;
+      background: rgba(255, 255, 255, 0.72);
+      font-size: 0.78rem;
+      color: #3f4f67;
+    }
+
+    .overview-card strong {
+      display: block;
+      margin-top: 0.2rem;
+      font-size: 1.02rem;
+      color: #1f2f46;
+    }
+
+    form {
+      display: grid;
+      gap: 0.55rem;
+      margin-bottom: 0.7rem;
+    }
+
+    label {
+      display: grid;
+      gap: 0.28rem;
+      font-size: 0.84rem;
+      color: #354968;
+    }
+
+    input,
+    select,
+    textarea,
+    button {
+      font-family: inherit;
+      font-size: 0.92rem;
+    }
+
+    input,
+    select,
+    textarea {
+      border: 1px solid rgba(29, 46, 72, 0.22);
+      border-radius: 10px;
+      padding: 0.56rem 0.6rem;
+      background: rgba(255, 255, 255, 0.9);
+      color: #223048;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 74px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.55rem;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 0.42rem;
+      font-size: 0.83rem;
+      color: #3f516d;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 0.56rem 0.74rem;
+      background: linear-gradient(145deg, #19334d, #264f77);
+      color: #f6f8fb;
+      cursor: pointer;
+      transition: transform 130ms ease, opacity 130ms ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .button-alt {
+      background: linear-gradient(145deg, #d4552d, #bb3d17);
+    }
+
+    .button-subtle {
+      background: linear-gradient(145deg, #0f8a8d, #0a6667);
+    }
+
+    .active-wallet {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.62rem;
+      background: rgba(255, 255, 255, 0.72);
+      margin-bottom: 0.7rem;
+      font-size: 0.83rem;
+      color: #3a4c68;
+      line-height: 1.4;
+    }
+
+    .mono {
+      font-family: var(--mono);
+      font-size: 0.77rem;
+      word-break: break-all;
+    }
+
+    .proposal-list {
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .proposal-toolbar {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr auto;
+      gap: 0.52rem;
+      margin: 0 0 0.68rem;
+    }
+
+    .proposal-toolbar input,
+    .proposal-toolbar select {
+      margin: 0;
+    }
+
+    .mini-actions {
+      display: flex;
+      gap: 0.4rem;
+      flex-wrap: wrap;
+    }
+
+    .mini-actions button {
+      padding-inline: 0.58rem;
+      white-space: nowrap;
+    }
+
+    .proposal {
+      border: 1px solid rgba(30, 48, 74, 0.2);
+      border-radius: 12px;
+      padding: 0.75rem;
+      background: rgba(255, 255, 255, 0.86);
+      display: grid;
+      gap: 0.52rem;
+    }
+
+    .proposal h3 {
+      margin: 0;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+    }
+
+    .proposal p {
+      margin: 0;
+      color: #40506a;
+      font-size: 0.89rem;
+      line-height: 1.35;
+    }
+
+    .vote-strip {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+    }
+
+    .metric {
+      border: 1px solid rgba(29, 46, 72, 0.18);
+      border-radius: 10px;
+      padding: 0.52rem;
+      background: rgba(255, 255, 255, 0.72);
+      font-size: 0.82rem;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 1rem;
+      margin-top: 0.1rem;
+    }
+
+    .actions {
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .actions .yes {
+      background: linear-gradient(145deg, #1f7a38, #145c2a);
+    }
+
+    .actions .no {
+      background: linear-gradient(145deg, #b42318, #8f1d14);
+    }
+
+    .small {
+      font-size: 0.8rem;
+      color: #50617d;
+    }
+
+    .comments {
+      display: grid;
+      gap: 0.38rem;
+      margin-top: 0.1rem;
+      max-height: 130px;
+      overflow: auto;
+      padding-right: 0.18rem;
+    }
+
+    .comment {
+      border: 1px solid rgba(29, 46, 72, 0.13);
+      border-radius: 9px;
+      padding: 0.46rem 0.5rem;
+      background: rgba(255, 255, 255, 0.76);
+      font-size: 0.78rem;
+      color: #324560;
+    }
+
+    .ledger {
+      border: 1px solid rgba(29, 46, 72, 0.16);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.78);
+      padding: 0.58rem;
+      max-height: 250px;
+      overflow: auto;
+      font-size: 0.74rem;
+      font-family: var(--mono);
+      line-height: 1.36;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .data-tools {
+      display: flex;
+      gap: 0.42rem;
+      flex-wrap: wrap;
+      margin: 0.62rem 0 0.78rem;
+    }
+
+    .data-tools button {
+      padding-inline: 0.62rem;
+    }
+
+    .notes {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.35rem;
+      max-height: 220px;
+      overflow: auto;
+    }
+
+    .notes li {
+      border: 1px solid rgba(29, 46, 72, 0.12);
+      border-radius: 10px;
+      padding: 0.45rem 0.5rem;
+      font-size: 0.79rem;
+      background: rgba(255, 255, 255, 0.8);
+      color: #334763;
+    }
+
+    .empty {
+      color: #5b6b84;
+      font-size: 0.83rem;
+      border: 1px dashed rgba(29, 46, 72, 0.2);
+      border-radius: 10px;
+      padding: 0.5rem;
+      background: rgba(255, 255, 255, 0.55);
+    }
+
+    .toast {
+      position: fixed;
+      right: 1rem;
+      bottom: 1rem;
+      background: #192a40;
+      color: #f4f8ff;
+      padding: 0.62rem 0.76rem;
+      border-radius: 10px;
+      box-shadow: 0 12px 30px rgba(10, 20, 32, 0.25);
+      font-size: 0.83rem;
+      transform: translateY(10px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 180ms ease, transform 180ms ease;
+      max-width: min(90vw, 380px);
+      z-index: 5;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 1020px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      .overview {
+        grid-template-columns: repeat(2, minmax(100px, 1fr));
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+      }
+
+      .proposal-toolbar {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @keyframes pageIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="hero">
+      <h1>DAO Voting System</h1>
+      <p class="sub">
+        One-file demo: wallet-style login, proposal creation, YES/NO voting, one vote per member, immutable vote chain, comments, notifications, and admin analytics.
+      </p>
+      <div class="pill-row">
+        <span class="pill">Transparent Public Votes</span>
+        <span class="pill">Wallet Signature Simulation</span>
+        <span class="pill">Deadline Auto-Close</span>
+        <span class="pill">Token Weighted (Optional)</span>
+      </div>
+      <div class="hero-links">
+        <a class="hero-link" href="./dao_voting.py" target="_blank" rel="noopener">Python Backend File</a>
+        <a class="hero-link" href="./test_dao_voting.py" target="_blank" rel="noopener">Python Test File</a>
+        <a class="hero-link" href="https://www.python.org/" target="_blank" rel="noopener">Python Language</a>
+      </div>
+      <div class="overview" id="overviewStrip">
+        <div class="overview-card">Members<strong id="metricMembers">0</strong></div>
+        <div class="overview-card">Proposals<strong id="metricProposals">0</strong></div>
+        <div class="overview-card">Open<strong id="metricOpen">0</strong></div>
+        <div class="overview-card">Closed<strong id="metricClosed">0</strong></div>
+        <div class="overview-card">Votes<strong id="metricVotes">0</strong></div>
+        <div class="overview-card">Participants<strong id="metricParticipants">0</strong></div>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="panel delay-1">
+        <h2>Members and Wallet Login</h2>
+        <div class="active-wallet" id="activeWalletBox">
+          Active wallet: not logged in
+        </div>
+
+        <form id="registerForm">
+          <label>
+            Member Name
+            <input id="memberName" required placeholder="Example: Alice">
+          </label>
+          <div class="row">
+            <label>
+              Tokens
+              <input id="memberTokens" type="number" min="0" value="1" required>
+            </label>
+            <label class="check" style="margin-top: 1.45rem;">
+              <input id="memberCanCreate" type="checkbox" checked>
+              Can create proposals
+            </label>
+          </div>
+          <label class="check">
+            <input id="memberAdmin" type="checkbox">
+            Admin access
+          </label>
+          <button type="submit">Register Member</button>
+        </form>
+
+        <form id="loginForm">
+          <label>
+            Choose Wallet
+            <select id="memberSelect"></select>
+          </label>
+          <div class="small" id="nonceLabel"></div>
+          <button type="submit" class="button-subtle">Sign In with Wallet</button>
+        </form>
+
+        <div id="memberList" class="meta"></div>
+      </section>
+
+      <section class="panel delay-2">
+        <h2>Create Proposal and Vote</h2>
+        <form id="proposalForm">
+          <label>
+            Title
+            <input id="proposalTitle" required placeholder="Proposal title">
+          </label>
+          <label>
+            Description
+            <textarea id="proposalDesc" required placeholder="What decision should members vote on?"></textarea>
+          </label>
+          <label>
+            Deadline
+            <input id="proposalDeadline" type="datetime-local" required>
+          </label>
+          <label class="check">
+            <input id="tokenWeightedToggle" type="checkbox">
+            Use token-weighted voting for next votes
+          </label>
+          <button type="submit" class="button-alt">Create Proposal</button>
+        </form>
+
+        <div class="proposal-toolbar">
+          <input id="proposalSearch" placeholder="Search by title, description, or proposal ID">
+          <select id="proposalSort">
+            <option value="newest">Sort: Newest</option>
+            <option value="oldest">Sort: Oldest</option>
+            <option value="deadline">Sort: Deadline Soon</option>
+            <option value="votes">Sort: Most Votes</option>
+          </select>
+          <div class="mini-actions">
+            <button type="button" id="advanceTimeBtn" class="button-subtle">Advance +1h</button>
+          </div>
+        </div>
+
+        <div id="proposalList" class="proposal-list"></div>
+      </section>
+
+      <section class="panel delay-3">
+        <h2>Transparency and Admin</h2>
+        <div class="meta">
+          <div>Ledger integrity: <strong id="ledgerStatus">valid</strong></div>
+          <div>Total blocks: <strong id="blockCount">1</strong></div>
+        </div>
+        <div class="data-tools">
+          <button type="button" id="exportJsonBtn">Export DAO JSON</button>
+          <button type="button" id="importJsonBtn" class="button-subtle">Import DAO JSON</button>
+          <input id="importJsonInput" type="file" accept=".json,application/json" hidden>
+        </div>
+        <div id="ledgerView" class="ledger"></div>
+
+        <h2 style="margin-top: 0.9rem;">Notifications</h2>
+        <ul id="notificationList" class="notes"></ul>
+
+        <h2 style="margin-top: 0.9rem;">Admin Dashboard</h2>
+        <div id="dashboardBox" class="meta"></div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const state = {
+      members: new Map(),
+      proposals: new Map(),
+      ledger: [],
+      proposalCounter: 1,
+      activeWallet: null,
+      loginNonce: "",
+    };
+
+    const el = {
+      registerForm: document.getElementById("registerForm"),
+      memberName: document.getElementById("memberName"),
+      memberTokens: document.getElementById("memberTokens"),
+      memberCanCreate: document.getElementById("memberCanCreate"),
+      memberAdmin: document.getElementById("memberAdmin"),
+      loginForm: document.getElementById("loginForm"),
+      memberSelect: document.getElementById("memberSelect"),
+      nonceLabel: document.getElementById("nonceLabel"),
+      activeWalletBox: document.getElementById("activeWalletBox"),
+      metricMembers: document.getElementById("metricMembers"),
+      metricProposals: document.getElementById("metricProposals"),
+      metricOpen: document.getElementById("metricOpen"),
+      metricClosed: document.getElementById("metricClosed"),
+      metricVotes: document.getElementById("metricVotes"),
+      metricParticipants: document.getElementById("metricParticipants"),
+      proposalForm: document.getElementById("proposalForm"),
+      proposalTitle: document.getElementById("proposalTitle"),
+      proposalDesc: document.getElementById("proposalDesc"),
+      proposalDeadline: document.getElementById("proposalDeadline"),
+      tokenWeightedToggle: document.getElementById("tokenWeightedToggle"),
+      proposalSearch: document.getElementById("proposalSearch"),
+      proposalSort: document.getElementById("proposalSort"),
+      advanceTimeBtn: document.getElementById("advanceTimeBtn"),
+      proposalList: document.getElementById("proposalList"),
+      memberList: document.getElementById("memberList"),
+      ledgerView: document.getElementById("ledgerView"),
+      ledgerStatus: document.getElementById("ledgerStatus"),
+      blockCount: document.getElementById("blockCount"),
+      exportJsonBtn: document.getElementById("exportJsonBtn"),
+      importJsonBtn: document.getElementById("importJsonBtn"),
+      importJsonInput: document.getElementById("importJsonInput"),
+      notificationList: document.getElementById("notificationList"),
+      dashboardBox: document.getElementById("dashboardBox"),
+      toast: document.getElementById("toast"),
+    };
+
+    function nowIso() {
+      return new Date().toISOString();
+    }
+
+    function randomHex(length) {
+      const bytes = new Uint8Array(Math.ceil(length / 2));
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("").slice(0, length);
+    }
+
+    function pseudoHash(input) {
+      let h1 = 0xdeadbeef ^ input.length;
+      let h2 = 0x41c6ce57 ^ input.length;
+      for (let i = 0; i < input.length; i++) {
+        const c = input.charCodeAt(i);
+        h1 = Math.imul(h1 ^ c, 2654435761);
+        h2 = Math.imul(h2 ^ c, 1597334677);
+      }
+      h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+      h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+      const a = (h1 >>> 0).toString(16).padStart(8, "0");
+      const b = (h2 >>> 0).toString(16).padStart(8, "0");
+      return (a + b).repeat(4).slice(0, 64);
+    }
+
+    function canonical(action, payload) {
+      const merged = { action, ...payload };
+      return JSON.stringify(Object.keys(merged).sort().reduce((acc, key) => {
+        acc[key] = merged[key];
+        return acc;
+      }, {}));
+    }
+
+    function signMessage(member, message) {
+      return pseudoHash(member.privateKey + "|" + message);
+    }
+
+    function verifySignature(address, message, signature) {
+      const member = state.members.get(address);
+      if (!member) return false;
+      return signMessage(member, message) === signature;
+    }
+
+    function createWallet() {
+      const privateKey = randomHex(64);
+      const address = "0x" + pseudoHash(privateKey).slice(0, 40);
+      return { privateKey, address };
+    }
+
+    function showToast(message) {
+      el.toast.textContent = message;
+      el.toast.classList.add("show");
+      window.clearTimeout(showToast._timer);
+      showToast._timer = window.setTimeout(() => {
+        el.toast.classList.remove("show");
+      }, 2200);
+    }
+
+    function loginMessage(nonce) {
+      return canonical("login", { nonce });
+    }
+
+    function createProposalMessage(title, description, deadlineIso) {
+      return canonical("create_proposal", { title, description, deadline: deadlineIso });
+    }
+
+    function voteMessage(proposalId, choice, tokenWeighted) {
+      return canonical("cast_vote", { proposal_id: proposalId, choice, token_weighted: tokenWeighted });
+    }
+
+    function commentMessage(proposalId, text) {
+      return canonical("add_comment", { proposal_id: proposalId, text });
+    }
+
+    function proposalOpen(proposal) {
+      return Date.now() < proposal.deadlineMs && !proposal.finalized;
+    }
+
+    function formatDate(ms) {
+      return new Date(ms).toLocaleString();
+    }
+
+    function timeLeftText(deadlineMs) {
+      const diff = deadlineMs - Date.now();
+      if (diff <= 0) return "ended";
+      const totalSeconds = Math.floor(diff / 1000);
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor((totalSeconds % 86400) / 3600);
+      const minutes = Math.floor((totalSeconds % 3600) / 60);
+      const seconds = totalSeconds % 60;
+
+      if (days > 0) return days + "d " + hours + "h";
+      if (hours > 0) return hours + "h " + minutes + "m";
+      if (minutes > 0) return minutes + "m " + seconds + "s";
+      return seconds + "s";
+    }
+
+    function toLocalDateTimeValue(ms) {
+      const d = new Date(ms);
+      d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+      return d.toISOString().slice(0, 16);
+    }
+
+    function getOverviewStats() {
+      let open = 0;
+      let totalVotes = 0;
+      const uniqueVoters = new Set();
+
+      for (const proposal of state.proposals.values()) {
+        if (proposalOpen(proposal)) open += 1;
+        totalVotes += proposal.yesVotes + proposal.noVotes;
+        for (const voter of proposal.voters) {
+          uniqueVoters.add(voter);
+        }
+      }
+
+      return {
+        members: state.members.size,
+        proposals: state.proposals.size,
+        open,
+        closed: state.proposals.size - open,
+        votes: totalVotes,
+        participants: uniqueVoters.size,
+      };
+    }
+
+    function serializeState() {
+      return {
+        members: Array.from(state.members.values()),
+        proposals: Array.from(state.proposals.values()).map((proposal) => ({
+          ...proposal,
+          voters: Array.from(proposal.voters),
+        })),
+        ledger: state.ledger,
+        proposalCounter: state.proposalCounter,
+        activeWallet: state.activeWallet,
+      };
+    }
+
+    function loadFromSerialized(data) {
+      if (!data || typeof data !== "object") {
+        throw new Error("Invalid JSON file.");
+      }
+
+      const rawMembers = Array.isArray(data.members) ? data.members : [];
+      const rawProposals = Array.isArray(data.proposals) ? data.proposals : [];
+      const rawLedger = Array.isArray(data.ledger) ? data.ledger : [];
+
+      const memberMap = new Map();
+      for (const raw of rawMembers) {
+        if (!raw || typeof raw !== "object") continue;
+        if (!raw.address || !raw.privateKey) continue;
+        memberMap.set(raw.address, {
+          address: String(raw.address),
+          privateKey: String(raw.privateKey),
+          name: String(raw.name || "Member"),
+          tokens: Math.max(0, Number(raw.tokens) || 0),
+          canCreate: !!raw.canCreate,
+          isAdmin: !!raw.isAdmin,
+          joinedAt: String(raw.joinedAt || nowIso()),
+          notifications: Array.isArray(raw.notifications) ? raw.notifications.map(String) : [],
+        });
+      }
+
+      const proposalMap = new Map();
+      for (const raw of rawProposals) {
+        if (!raw || typeof raw !== "object") continue;
+        if (!raw.id) continue;
+        const voters = Array.isArray(raw.voters) ? new Set(raw.voters.map(String)) : new Set();
+        const comments = Array.isArray(raw.comments) ? raw.comments : [];
+        proposalMap.set(String(raw.id), {
+          id: String(raw.id),
+          title: String(raw.title || "Untitled Proposal"),
+          description: String(raw.description || ""),
+          creator: String(raw.creator || ""),
+          createdAt: String(raw.createdAt || nowIso()),
+          deadlineMs: Number(raw.deadlineMs) || Date.now(),
+          yesVotes: Number(raw.yesVotes) || 0,
+          noVotes: Number(raw.noVotes) || 0,
+          yesWeight: Number(raw.yesWeight) || 0,
+          noWeight: Number(raw.noWeight) || 0,
+          voters,
+          comments: comments.map((c) => ({
+            author: String(c.author || ""),
+            text: String(c.text || ""),
+            createdAt: String(c.createdAt || nowIso()),
+          })),
+          finalized: !!raw.finalized,
+        });
+      }
+
+      state.members = memberMap;
+      state.proposals = proposalMap;
+      state.ledger = rawLedger;
+
+      if (!state.ledger.length) {
+        addGenesisBlock();
+      }
+
+      const maxProposalNumber = Array.from(state.proposals.keys()).reduce((max, id) => {
+        const n = Number(String(id).replace("P-", ""));
+        return Number.isFinite(n) ? Math.max(max, n) : max;
+      }, 0);
+      const savedCounter = Number(data.proposalCounter);
+      state.proposalCounter = Number.isFinite(savedCounter) && savedCounter > 0
+        ? Math.floor(savedCounter)
+        : maxProposalNumber + 1;
+
+      const savedActive = typeof data.activeWallet === "string" ? data.activeWallet : null;
+      state.activeWallet = savedActive && state.members.has(savedActive) ? savedActive : null;
+      if (!state.activeWallet && state.members.size) {
+        state.activeWallet = Array.from(state.members.keys())[0];
+      }
+    }
+
+    function downloadStateJson() {
+      const payload = JSON.stringify(serializeState(), null, 2);
+      const blob = new Blob([payload], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "dao-voting-state.json";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function appendNotification(address, text) {
+      const member = state.members.get(address);
+      if (!member) return;
+      member.notifications.push(text);
+    }
+
+    function registerMember({ name, tokens, canCreate, isAdmin }) {
+      const { privateKey, address } = createWallet();
+      const member = {
+        address,
+        privateKey,
+        name,
+        tokens,
+        canCreate,
+        isAdmin,
+        joinedAt: nowIso(),
+        notifications: ["Welcome to the DAO."],
+      };
+      state.members.set(address, member);
+      refreshMemberUI();
+      showToast("Member registered: " + name);
+    }
+
+    function setActiveWallet(address) {
+      state.activeWallet = address || null;
+      const member = address ? state.members.get(address) : null;
+      if (!member) {
+        el.activeWalletBox.textContent = "Active wallet: not logged in";
+      } else {
+        el.activeWalletBox.innerHTML =
+          "<strong>Active wallet:</strong> " + member.name + "<br>" +
+          "<span class='mono'>" + member.address + "</span>";
+      }
+      renderOverview();
+      renderNotifications();
+      renderDashboard();
+      renderProposals();
+    }
+
+    function addGenesisBlock() {
+      const tx = {
+        proposal_id: "GENESIS",
+        voter: "SYSTEM",
+        choice: "YES",
+        weight: 0,
+        timestamp: nowIso(),
+        signature: "GENESIS",
+      };
+      const previous_hash = "0".repeat(64);
+      const block = {
+        index: 0,
+        previous_hash,
+        tx,
+      };
+      block.block_hash = pseudoHash(JSON.stringify(block));
+      state.ledger.push(block);
+    }
+
+    function addVoteBlock(tx) {
+      const previous = state.ledger[state.ledger.length - 1];
+      const block = {
+        index: previous.index + 1,
+        previous_hash: previous.block_hash,
+        tx,
+      };
+      block.block_hash = pseudoHash(JSON.stringify(block));
+      state.ledger.push(block);
+    }
+
+    function ledgerValid() {
+      for (let i = 0; i < state.ledger.length; i++) {
+        const block = state.ledger[i];
+        const check = {
+          index: block.index,
+          previous_hash: block.previous_hash,
+          tx: block.tx,
+        };
+        if (pseudoHash(JSON.stringify(check)) !== block.block_hash) return false;
+        if (i > 0 && block.previous_hash !== state.ledger[i - 1].block_hash) return false;
+      }
+      return true;
+    }
+
+    function createProposal({ title, description, deadlineIso }) {
+      if (!state.activeWallet) throw new Error("Login with wallet first.");
+      const creator = state.members.get(state.activeWallet);
+      if (!creator) throw new Error("Active member not found.");
+      if (!creator.canCreate) throw new Error("You do not have proposal creation permission.");
+      const deadlineMs = Date.parse(deadlineIso);
+      if (!Number.isFinite(deadlineMs)) throw new Error("Invalid deadline.");
+      if (deadlineMs <= Date.now()) throw new Error("Deadline must be in the future.");
+
+      const message = createProposalMessage(title, description, new Date(deadlineMs).toISOString());
+      const signature = signMessage(creator, message);
+      if (!verifySignature(creator.address, message, signature)) throw new Error("Invalid wallet signature.");
+
+      const id = "P-" + String(state.proposalCounter).padStart(4, "0");
+      state.proposalCounter += 1;
+
+      const proposal = {
+        id,
+        title,
+        description,
+        creator: creator.address,
+        createdAt: nowIso(),
+        deadlineMs,
+        yesVotes: 0,
+        noVotes: 0,
+        yesWeight: 0,
+        noWeight: 0,
+        voters: new Set(),
+        comments: [],
+        finalized: false,
+      };
+      state.proposals.set(id, proposal);
+
+      for (const address of state.members.keys()) {
+        if (address !== creator.address) {
+          appendNotification(address, "New proposal " + id + ": " + title);
+        }
+      }
+      showToast("Proposal created: " + id);
+    }
+
+    function castVote(proposalId, choice) {
+      if (!state.activeWallet) throw new Error("Login with wallet first.");
+      const member = state.members.get(state.activeWallet);
+      if (!member) throw new Error("Active member not found.");
+
+      const proposal = state.proposals.get(proposalId);
+      if (!proposal) throw new Error("Proposal not found.");
+      if (!proposalOpen(proposal)) throw new Error("Voting is closed for this proposal.");
+      if (proposal.voters.has(member.address)) throw new Error("You have already voted on this proposal.");
+
+      const tokenWeighted = !!el.tokenWeightedToggle.checked;
+      const normalized = choice === "NO" ? "NO" : "YES";
+      const message = voteMessage(proposalId, normalized, tokenWeighted);
+      const signature = signMessage(member, message);
+      if (!verifySignature(member.address, message, signature)) throw new Error("Invalid wallet signature.");
+
+      const weight = tokenWeighted ? member.tokens : 1;
+      const tx = {
+        proposal_id: proposalId,
+        voter: member.address,
+        choice: normalized,
+        weight,
+        timestamp: nowIso(),
+        signature,
+      };
+      addVoteBlock(tx);
+
+      proposal.voters.add(member.address);
+      if (normalized === "YES") {
+        proposal.yesVotes += 1;
+        proposal.yesWeight += weight;
+      } else {
+        proposal.noVotes += 1;
+        proposal.noWeight += weight;
+      }
+      showToast("Vote recorded on " + proposalId);
+    }
+
+    function addComment(proposalId, text) {
+      if (!state.activeWallet) throw new Error("Login with wallet first.");
+      const member = state.members.get(state.activeWallet);
+      if (!member) throw new Error("Active member not found.");
+      if (!text.trim()) throw new Error("Comment text cannot be empty.");
+
+      const proposal = state.proposals.get(proposalId);
+      if (!proposal) throw new Error("Proposal not found.");
+
+      const message = commentMessage(proposalId, text);
+      const signature = signMessage(member, message);
+      if (!verifySignature(member.address, message, signature)) throw new Error("Invalid wallet signature.");
+
+      proposal.comments.push({
+        author: member.address,
+        text: text.trim(),
+        createdAt: nowIso(),
+      });
+      showToast("Comment added.");
+    }
+
+    function finalizeExpiredProposals() {
+      const now = Date.now();
+      for (const proposal of state.proposals.values()) {
+        if (proposal.finalized) continue;
+        if (now < proposal.deadlineMs) continue;
+        proposal.finalized = true;
+        const msg = "Results for " + proposal.id + ": YES=" + proposal.yesVotes + ", NO=" + proposal.noVotes;
+        for (const address of state.members.keys()) {
+          appendNotification(address, msg);
+        }
+      }
+    }
+
+    function getProposalPublicVotes(proposalId) {
+      return state.ledger.filter(b => b.tx.proposal_id === proposalId);
+    }
+
+    function refreshMemberUI() {
+      const entries = Array.from(state.members.values());
+      el.memberSelect.innerHTML = "";
+      for (const member of entries) {
+        const option = document.createElement("option");
+        option.value = member.address;
+        option.textContent = member.name + " (" + member.address.slice(0, 8) + "... )";
+        el.memberSelect.appendChild(option);
+      }
+
+      if (!state.activeWallet && entries.length) {
+        setActiveWallet(entries[0].address);
+      }
+
+      if (state.activeWallet && !state.members.has(state.activeWallet)) {
+        setActiveWallet(null);
+      }
+
+      if (!entries.length) {
+        el.memberList.innerHTML = "<div class='empty'>No members yet.</div>";
+      } else {
+        el.memberList.innerHTML = entries.map(m => (
+          "<div class='mono'>" +
+          m.name + " | " + m.address.slice(0, 20) + "... | tokens: " + m.tokens +
+          (m.canCreate ? " | create: yes" : " | create: no") +
+          (m.isAdmin ? " | admin: yes" : "") +
+          "</div>"
+        )).join("");
+      }
+
+      if (state.activeWallet) {
+        el.memberSelect.value = state.activeWallet;
+      }
+
+      renderOverview();
+      renderNotifications();
+      renderDashboard();
+      renderProposals();
+    }
+
+    function visibleProposals() {
+      const search = (el.proposalSearch.value || "").trim().toLowerCase();
+      const sortMode = el.proposalSort.value || "newest";
+      let proposals = Array.from(state.proposals.values());
+
+      if (search) {
+        proposals = proposals.filter((proposal) => {
+          const haystack = [
+            proposal.id,
+            proposal.title,
+            proposal.description,
+            proposal.creator,
+          ].join(" ").toLowerCase();
+          return haystack.includes(search);
+        });
+      }
+
+      proposals.sort((a, b) => {
+        if (sortMode === "oldest") {
+          return Date.parse(a.createdAt) - Date.parse(b.createdAt);
+        }
+        if (sortMode === "deadline") {
+          return a.deadlineMs - b.deadlineMs;
+        }
+        if (sortMode === "votes") {
+          return (b.yesVotes + b.noVotes) - (a.yesVotes + a.noVotes);
+        }
+        return Date.parse(b.createdAt) - Date.parse(a.createdAt);
+      });
+
+      return proposals;
+    }
+
+    function renderProposals() {
+      const proposals = visibleProposals();
+
+      if (!proposals.length) {
+        if (state.proposals.size) {
+          el.proposalList.innerHTML = "<div class='empty'>No proposals match your search/filter.</div>";
+        } else {
+          el.proposalList.innerHTML = "<div class='empty'>No proposals yet. Create one above.</div>";
+        }
+        return;
+      }
+
+      el.proposalList.innerHTML = "";
+      for (const proposal of proposals) {
+        const open = proposalOpen(proposal);
+        const totalVotes = proposal.yesVotes + proposal.noVotes;
+        const totalWeight = proposal.yesWeight + proposal.noWeight;
+        const publicVotes = getProposalPublicVotes(proposal.id);
+
+        const card = document.createElement("article");
+        card.className = "proposal";
+        card.innerHTML =
+          "<h3>" + proposal.id + " | " + escapeHtml(proposal.title) + "</h3>" +
+          "<p>" + escapeHtml(proposal.description) + "</p>" +
+          "<div class='pill-row'>" +
+            "<span class='pill " + (open ? "ok" : "no") + "'>" + (open ? "Open" : "Closed") + "</span>" +
+            "<span class='pill'>Deadline: " + escapeHtml(formatDate(proposal.deadlineMs)) + "</span>" +
+            "<span class='pill'>Time left: " + escapeHtml(timeLeftText(proposal.deadlineMs)) + "</span>" +
+          "</div>" +
+          "<div class='vote-strip'>" +
+            "<div class='metric'>YES votes<strong>" + proposal.yesVotes + "</strong>weight: " + proposal.yesWeight + "</div>" +
+            "<div class='metric'>NO votes<strong>" + proposal.noVotes + "</strong>weight: " + proposal.noWeight + "</div>" +
+          "</div>" +
+          "<div class='small'>Voters: " + proposal.voters.size + " | Total votes: " + totalVotes + " | Public vote tx: " + publicVotes.length + " | Total weighted power: " + totalWeight + "</div>" +
+          "<div class='actions'>" +
+            "<button type='button' class='yes' data-action='vote-yes'>Vote YES</button>" +
+            "<button type='button' class='no' data-action='vote-no'>Vote NO</button>" +
+          "</div>" +
+          "<form data-action='comment-form'>" +
+            "<label>Comment" +
+              "<input data-comment-input placeholder='Write a comment for this proposal'>" +
+            "</label>" +
+            "<button type='submit'>Add Comment</button>" +
+          "</form>" +
+          "<div class='comments'>" +
+            (proposal.comments.length
+              ? proposal.comments.map(c =>
+                  "<div class='comment'><strong>" + escapeHtml(shortAddr(c.author)) + "</strong> · " +
+                  escapeHtml(new Date(c.createdAt).toLocaleString()) + "<br>" +
+                  escapeHtml(c.text) + "</div>"
+                ).join("")
+              : "<div class='empty'>No comments yet.</div>") +
+          "</div>";
+
+        const yesBtn = card.querySelector("[data-action='vote-yes']");
+        const noBtn = card.querySelector("[data-action='vote-no']");
+        yesBtn.disabled = !open;
+        noBtn.disabled = !open;
+
+        yesBtn.addEventListener("click", () => {
+          try {
+            castVote(proposal.id, "YES");
+            redraw();
+          } catch (error) {
+            showToast(error.message);
+          }
+        });
+
+        noBtn.addEventListener("click", () => {
+          try {
+            castVote(proposal.id, "NO");
+            redraw();
+          } catch (error) {
+            showToast(error.message);
+          }
+        });
+
+        const commentForm = card.querySelector("[data-action='comment-form']");
+        commentForm.addEventListener("submit", (event) => {
+          event.preventDefault();
+          const input = card.querySelector("[data-comment-input]");
+          try {
+            addComment(proposal.id, input.value);
+            input.value = "";
+            redraw();
+          } catch (error) {
+            showToast(error.message);
+          }
+        });
+
+        el.proposalList.appendChild(card);
+      }
+    }
+
+    function renderOverview() {
+      const stats = getOverviewStats();
+      el.metricMembers.textContent = String(stats.members);
+      el.metricProposals.textContent = String(stats.proposals);
+      el.metricOpen.textContent = String(stats.open);
+      el.metricClosed.textContent = String(stats.closed);
+      el.metricVotes.textContent = String(stats.votes);
+      el.metricParticipants.textContent = String(stats.participants);
+    }
+
+    function renderLedger() {
+      el.ledgerStatus.textContent = ledgerValid() ? "valid" : "invalid";
+      el.ledgerStatus.style.color = ledgerValid() ? "var(--ok)" : "var(--no)";
+      el.blockCount.textContent = String(state.ledger.length);
+
+      const lines = state.ledger.map(block => {
+        return [
+          "[" + block.index + "] " + block.tx.proposal_id + " | " + block.tx.choice,
+          "voter: " + shortAddr(block.tx.voter),
+          "weight: " + block.tx.weight + " | time: " + new Date(block.tx.timestamp).toLocaleString(),
+          "hash: " + block.block_hash.slice(0, 40) + "...",
+          "prev: " + block.previous_hash.slice(0, 40) + "...",
+          ""
+        ].join("\n");
+      });
+      el.ledgerView.textContent = lines.join("\n");
+    }
+
+    function renderNotifications() {
+      if (!state.activeWallet) {
+        el.notificationList.innerHTML = "<li>Login to view notifications.</li>";
+        return;
+      }
+      const member = state.members.get(state.activeWallet);
+      if (!member) {
+        el.notificationList.innerHTML = "<li>Member not found.</li>";
+        return;
+      }
+      const notes = member.notifications.slice().reverse();
+      if (!notes.length) {
+        el.notificationList.innerHTML = "<li>No notifications.</li>";
+        return;
+      }
+      el.notificationList.innerHTML = notes.map(n => "<li>" + escapeHtml(n) + "</li>").join("");
+    }
+
+    function renderDashboard() {
+      if (!state.activeWallet) {
+        el.dashboardBox.innerHTML = "<div class='empty'>Login as admin to view dashboard.</div>";
+        return;
+      }
+      const member = state.members.get(state.activeWallet);
+      if (!member || !member.isAdmin) {
+        el.dashboardBox.innerHTML = "<div class='empty'>Admin access required.</div>";
+        return;
+      }
+
+      let openProposals = 0;
+      let totalVotes = 0;
+      const participation = new Map();
+      for (const proposal of state.proposals.values()) {
+        if (proposalOpen(proposal)) openProposals += 1;
+        totalVotes += proposal.yesVotes + proposal.noVotes;
+        for (const voter of proposal.voters) {
+          participation.set(voter, (participation.get(voter) || 0) + 1);
+        }
+      }
+      const closedProposals = state.proposals.size - openProposals;
+      const top = Array.from(participation.entries()).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+      el.dashboardBox.innerHTML =
+        "<div>Total members: <strong>" + state.members.size + "</strong></div>" +
+        "<div>Total proposals: <strong>" + state.proposals.size + "</strong></div>" +
+        "<div>Open proposals: <strong>" + openProposals + "</strong></div>" +
+        "<div>Closed proposals: <strong>" + closedProposals + "</strong></div>" +
+        "<div>Total votes: <strong>" + totalVotes + "</strong></div>" +
+        "<div>Ledger valid: <strong>" + (ledgerValid() ? "yes" : "no") + "</strong></div>" +
+        "<div>Top participants: <strong>" +
+          (top.length ? top.map(([addr, count]) => shortAddr(addr) + " (" + count + ")").join(", ") : "none") +
+        "</strong></div>";
+    }
+
+    function redraw() {
+      finalizeExpiredProposals();
+      renderOverview();
+      renderProposals();
+      renderLedger();
+      renderNotifications();
+      renderDashboard();
+    }
+
+    function shortAddr(address) {
+      if (address.length <= 12) return address;
+      return address.slice(0, 8) + "..." + address.slice(-4);
+    }
+
+    function escapeHtml(text) {
+      return String(text)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function newNonce() {
+      state.loginNonce = "nonce-" + randomHex(10);
+      el.nonceLabel.textContent = "Sign this nonce: " + state.loginNonce;
+    }
+
+    function seedDemoData() {
+      registerMember({ name: "Alice", tokens: 10, canCreate: true, isAdmin: true });
+      registerMember({ name: "Bob", tokens: 3, canCreate: true, isAdmin: false });
+      registerMember({ name: "Charlie", tokens: 1, canCreate: false, isAdmin: false });
+
+      const aliceAddress = Array.from(state.members.keys())[0];
+      setActiveWallet(aliceAddress);
+      createProposal({
+        title: "Fund Open Source Tooling",
+        description: "Allocate a monthly budget to tooling and community grants.",
+        deadlineIso: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
+      });
+
+      const bobAddress = Array.from(state.members.keys())[1];
+      setActiveWallet(bobAddress);
+      castVote("P-0001", "YES");
+      addComment("P-0001", "I support this proposal.");
+      setActiveWallet(aliceAddress);
+      showToast("Demo data loaded.");
+    }
+
+    el.registerForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const name = el.memberName.value.trim();
+      const tokens = Number(el.memberTokens.value);
+      if (!name) {
+        showToast("Member name is required.");
+        return;
+      }
+      if (!Number.isFinite(tokens) || tokens < 0) {
+        showToast("Tokens must be 0 or more.");
+        return;
+      }
+      registerMember({
+        name,
+        tokens,
+        canCreate: el.memberCanCreate.checked,
+        isAdmin: el.memberAdmin.checked,
+      });
+      el.registerForm.reset();
+      el.memberTokens.value = "1";
+      el.memberCanCreate.checked = true;
+      redraw();
+    });
+
+    el.loginForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const address = el.memberSelect.value;
+      const member = state.members.get(address);
+      if (!member) {
+        showToast("Please register a member first.");
+        return;
+      }
+
+      const msg = loginMessage(state.loginNonce);
+      const signature = signMessage(member, msg);
+      if (!verifySignature(address, msg, signature)) {
+        showToast("Wallet login failed.");
+        return;
+      }
+      setActiveWallet(address);
+      newNonce();
+      showToast("Wallet login successful.");
+      redraw();
+    });
+
+    el.proposalForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      try {
+        const title = el.proposalTitle.value.trim();
+        const description = el.proposalDesc.value.trim();
+        const deadlineInput = el.proposalDeadline.value;
+        if (!title || !description || !deadlineInput) {
+          throw new Error("Title, description, and deadline are required.");
+        }
+        const deadlineIso = new Date(deadlineInput).toISOString();
+        createProposal({ title, description, deadlineIso });
+        el.proposalForm.reset();
+        el.proposalDeadline.value = toLocalDateTimeValue(Date.now() + 60 * 60 * 1000);
+        redraw();
+      } catch (error) {
+        showToast(error.message);
+      }
+    });
+
+    el.proposalSearch.addEventListener("input", () => {
+      renderProposals();
+    });
+
+    el.proposalSort.addEventListener("change", () => {
+      renderProposals();
+    });
+
+    el.advanceTimeBtn.addEventListener("click", () => {
+      if (!state.proposals.size) {
+        showToast("No proposals available.");
+        return;
+      }
+      for (const proposal of state.proposals.values()) {
+        proposal.deadlineMs -= 60 * 60 * 1000;
+      }
+      showToast("Simulated time advanced by 1 hour.");
+      redraw();
+    });
+
+    el.exportJsonBtn.addEventListener("click", () => {
+      downloadStateJson();
+      showToast("DAO state exported.");
+    });
+
+    el.importJsonBtn.addEventListener("click", () => {
+      el.importJsonInput.click();
+    });
+
+    el.importJsonInput.addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const parsed = JSON.parse(text);
+        loadFromSerialized(parsed);
+        refreshMemberUI();
+        setActiveWallet(state.activeWallet);
+        newNonce();
+        redraw();
+        showToast("DAO state imported.");
+      } catch (error) {
+        showToast("Import failed: " + error.message);
+      } finally {
+        el.importJsonInput.value = "";
+      }
+    });
+
+    function init() {
+      addGenesisBlock();
+      newNonce();
+      el.proposalDeadline.value = toLocalDateTimeValue(Date.now() + 60 * 60 * 1000);
+      seedDemoData();
+      redraw();
+      window.setInterval(redraw, 1000);
+    }
+
+    init();
+  </script>
+</body>
+</html>
