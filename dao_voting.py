@@ -456,8 +456,311 @@ class DAOVotingSystem:
             "top_participants": sorted(participation.items(), key=lambda item: item[1], reverse=True)[:5],
         }
 
+    @staticmethod
+    def _datetime_to_iso(value: datetime) -> str:
+        if value.tzinfo is None:
+            normalized = value.replace(tzinfo=timezone.utc)
+        else:
+            normalized = value.astimezone(timezone.utc)
+        return normalized.isoformat()
 
-if __name__ == "__main__":
+    @staticmethod
+    def _parse_datetime(value: str | None) -> datetime:
+        if not value:
+            return datetime.now(timezone.utc)
+        normalized = value.strip()
+        if normalized.endswith("Z"):
+            normalized = normalized[:-1] + "+00:00"
+        parsed = datetime.fromisoformat(normalized)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    @staticmethod
+    def _safe_int(value: Any, default: int = 0) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    def to_dict(self) -> Dict[str, Any]:
+        members_data: List[Dict[str, Any]] = []
+        for address, member in self.members.items():
+            wallet = self._wallets.get(address)
+            notifications = self.notifications.get(address, [])
+            members_data.append(
+                {
+                    "address": member.address,
+                    "display_name": member.display_name,
+                    "name": member.display_name,
+                    "tokens": member.tokens,
+                    "can_create_proposals": member.can_create_proposals,
+                    "canCreate": member.can_create_proposals,
+                    "is_admin": member.is_admin,
+                    "isAdmin": member.is_admin,
+                    "joined_at": self._datetime_to_iso(member.joined_at),
+                    "joinedAt": self._datetime_to_iso(member.joined_at),
+                    "private_key": wallet.private_key if wallet else "",
+                    "privateKey": wallet.private_key if wallet else "",
+                    "notifications": list(notifications),
+                }
+            )
+
+        proposals_data: List[Dict[str, Any]] = []
+        for proposal in self.proposals.values():
+            comments = [
+                {
+                    "author": comment.author,
+                    "text": comment.text,
+                    "created_at": self._datetime_to_iso(comment.created_at),
+                    "createdAt": self._datetime_to_iso(comment.created_at),
+                }
+                for comment in proposal.comments
+            ]
+            proposals_data.append(
+                {
+                    "proposal_id": proposal.proposal_id,
+                    "id": proposal.proposal_id,
+                    "title": proposal.title,
+                    "description": proposal.description,
+                    "deadline": self._datetime_to_iso(proposal.deadline),
+                    "deadlineMs": int(proposal.deadline.timestamp() * 1000),
+                    "creator": proposal.creator,
+                    "created_at": self._datetime_to_iso(proposal.created_at),
+                    "createdAt": self._datetime_to_iso(proposal.created_at),
+                    "yes_votes": proposal.yes_votes,
+                    "yesVotes": proposal.yes_votes,
+                    "no_votes": proposal.no_votes,
+                    "noVotes": proposal.no_votes,
+                    "yes_weight": proposal.yes_weight,
+                    "yesWeight": proposal.yes_weight,
+                    "no_weight": proposal.no_weight,
+                    "noWeight": proposal.no_weight,
+                    "voted_addresses": sorted(proposal.voted_addresses),
+                    "voters": sorted(proposal.voted_addresses),
+                    "comments": comments,
+                    "finalized": proposal.finalized,
+                }
+            )
+
+        ledger_data: List[Dict[str, Any]] = []
+        for block in self.ledger.blocks:
+            ledger_data.append(
+                {
+                    "index": block.index,
+                    "previous_hash": block.previous_hash,
+                    "tx": {
+                        "proposal_id": block.tx.proposal_id,
+                        "voter": block.tx.voter,
+                        "choice": block.tx.choice.value,
+                        "weight": block.tx.weight,
+                        "timestamp": block.tx.timestamp,
+                        "signature": block.tx.signature,
+                    },
+                    "block_hash": block.block_hash,
+                }
+            )
+
+        return {
+            "version": 1,
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "members": members_data,
+            "proposals": proposals_data,
+            "ledger": ledger_data,
+            "proposal_counter": self._proposal_counter,
+            "proposalCounter": self._proposal_counter,
+            "activeWallet": next(iter(self.members.keys()), None),
+        }
+
+    def save_json(self, path: str | Path) -> None:
+        output_path = Path(path)
+        output_path.write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "DAOVotingSystem":
+        dao = cls()
+        dao.members = {}
+        dao._wallets = {}
+        dao.proposals = {}
+        dao.notifications = {}
+        dao.ledger = VoteLedger()
+        dao._proposal_counter = 0
+
+        raw_members = data.get("members", [])
+        if not isinstance(raw_members, list):
+            raw_members = []
+
+        for raw_member in raw_members:
+            if not isinstance(raw_member, dict):
+                continue
+
+            address = str(raw_member.get("address", "")).strip()
+            private_key = str(
+                raw_member.get("private_key")
+                or raw_member.get("privateKey")
+                or ""
+            ).strip()
+            if not address or not private_key:
+                continue
+
+            wallet = Wallet(private_key=private_key)
+            if wallet.address != address:
+                raise ValueError(f"Wallet key/address mismatch for member: {address}")
+
+            joined_at_raw = raw_member.get("joined_at") or raw_member.get("joinedAt")
+            joined_at = cls._parse_datetime(str(joined_at_raw)) if joined_at_raw else datetime.now(timezone.utc)
+
+            member = Member(
+                address=address,
+                display_name=str(raw_member.get("display_name") or raw_member.get("name") or "Member"),
+                tokens=max(0, cls._safe_int(raw_member.get("tokens"), 1)),
+                can_create_proposals=bool(
+                    raw_member.get("can_create_proposals", raw_member.get("canCreate", True))
+                ),
+                is_admin=bool(raw_member.get("is_admin", raw_member.get("isAdmin", False))),
+                joined_at=joined_at,
+            )
+
+            dao.members[address] = member
+            dao._wallets[address] = wallet
+            notes = raw_member.get("notifications")
+            if isinstance(notes, list):
+                dao.notifications[address] = [str(note) for note in notes]
+            else:
+                dao.notifications[address] = ["Welcome to the DAO."]
+
+        raw_proposals = data.get("proposals", [])
+        if not isinstance(raw_proposals, list):
+            raw_proposals = []
+
+        max_counter = 0
+        for raw_proposal in raw_proposals:
+            if not isinstance(raw_proposal, dict):
+                continue
+
+            proposal_id = str(raw_proposal.get("proposal_id") or raw_proposal.get("id") or "").strip()
+            if not proposal_id:
+                continue
+
+            created_raw = raw_proposal.get("created_at") or raw_proposal.get("createdAt")
+            created_at = cls._parse_datetime(str(created_raw)) if created_raw else datetime.now(timezone.utc)
+
+            deadline_raw = raw_proposal.get("deadline")
+            if deadline_raw:
+                deadline = cls._parse_datetime(str(deadline_raw))
+            else:
+                deadline_ms = raw_proposal.get("deadlineMs")
+                if deadline_ms is None:
+                    deadline = datetime.now(timezone.utc) + timedelta(hours=1)
+                else:
+                    try:
+                        deadline = datetime.fromtimestamp(float(deadline_ms) / 1000, tz=timezone.utc)
+                    except (TypeError, ValueError):
+                        deadline = datetime.now(timezone.utc) + timedelta(hours=1)
+
+            comments_raw = raw_proposal.get("comments", [])
+            comments: List[Comment] = []
+            if isinstance(comments_raw, list):
+                for raw_comment in comments_raw:
+                    if not isinstance(raw_comment, dict):
+                        continue
+                    comment_created_raw = raw_comment.get("created_at") or raw_comment.get("createdAt")
+                    comment_created = (
+                        cls._parse_datetime(str(comment_created_raw))
+                        if comment_created_raw
+                        else datetime.now(timezone.utc)
+                    )
+                    comments.append(
+                        Comment(
+                            author=str(raw_comment.get("author", "")),
+                            text=str(raw_comment.get("text", "")),
+                            created_at=comment_created,
+                        )
+                    )
+
+            voted_raw = raw_proposal.get("voted_addresses", raw_proposal.get("voters", []))
+            voted_addresses = set()
+            if isinstance(voted_raw, list):
+                voted_addresses = {str(address) for address in voted_raw}
+
+            proposal = Proposal(
+                proposal_id=proposal_id,
+                title=str(raw_proposal.get("title", "")),
+                description=str(raw_proposal.get("description", "")),
+                deadline=deadline,
+                creator=str(raw_proposal.get("creator", "")),
+                created_at=created_at,
+                yes_votes=cls._safe_int(raw_proposal.get("yes_votes", raw_proposal.get("yesVotes", 0)), 0),
+                no_votes=cls._safe_int(raw_proposal.get("no_votes", raw_proposal.get("noVotes", 0)), 0),
+                yes_weight=cls._safe_int(raw_proposal.get("yes_weight", raw_proposal.get("yesWeight", 0)), 0),
+                no_weight=cls._safe_int(raw_proposal.get("no_weight", raw_proposal.get("noWeight", 0)), 0),
+                voted_addresses=voted_addresses,
+                comments=comments,
+                finalized=bool(raw_proposal.get("finalized", False)),
+            )
+            dao.proposals[proposal_id] = proposal
+
+            if proposal_id.startswith("P-"):
+                suffix = proposal_id[2:]
+                if suffix.isdigit():
+                    max_counter = max(max_counter, int(suffix))
+
+        raw_ledger = data.get("ledger", [])
+        if isinstance(raw_ledger, list) and raw_ledger:
+            parsed_blocks: List[VoteBlock] = []
+            for raw_block in raw_ledger:
+                if not isinstance(raw_block, dict):
+                    continue
+                tx_data = raw_block.get("tx")
+                if not isinstance(tx_data, dict):
+                    continue
+
+                raw_choice = str(tx_data.get("choice", "YES")).upper()
+                choice = VoteChoice.YES if raw_choice not in {"YES", "NO"} else VoteChoice(raw_choice)
+                tx = VoteTx(
+                    proposal_id=str(tx_data.get("proposal_id", "")),
+                    voter=str(tx_data.get("voter", "")),
+                    choice=choice,
+                    weight=cls._safe_int(tx_data.get("weight"), 0),
+                    timestamp=str(tx_data.get("timestamp", datetime.now(timezone.utc).isoformat())),
+                    signature=str(tx_data.get("signature", "")),
+                )
+                block_index = cls._safe_int(raw_block.get("index"), 0)
+                previous_hash = str(raw_block.get("previous_hash", "0" * 64))
+                block_hash = str(raw_block.get("block_hash", ""))
+                if not block_hash:
+                    block_hash = VoteLedger._hash_block_parts(block_index, previous_hash, tx)
+                parsed_blocks.append(
+                    VoteBlock(
+                        index=block_index,
+                        previous_hash=previous_hash,
+                        tx=tx,
+                        block_hash=block_hash,
+                    )
+                )
+            if parsed_blocks:
+                dao.ledger.blocks = parsed_blocks
+
+        raw_counter = data.get("proposal_counter", data.get("proposalCounter"))
+        saved_counter = cls._safe_int(raw_counter, 0)
+        dao._proposal_counter = saved_counter if saved_counter > 0 else max_counter
+
+        for address in dao.members:
+            dao.notifications.setdefault(address, ["Welcome to the DAO."])
+
+        return dao
+
+    @classmethod
+    def load_json(cls, path: str | Path) -> "DAOVotingSystem":
+        input_path = Path(path)
+        raw = input_path.read_text(encoding="utf-8")
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError("Invalid JSON structure")
+        return cls.from_dict(data)
+
+
+def _build_demo_system() -> tuple[DAOVotingSystem, str]:
     dao = DAOVotingSystem()
 
     alice_wallet = Wallet()
@@ -489,8 +792,35 @@ if __name__ == "__main__":
         signature=bob_wallet.sign(vote_msg),
         token_weighted=True,
     )
+    return dao, proposal.proposal_id
 
-    print("Results:", json.dumps(dao.get_results(proposal.proposal_id), indent=2))
-    print("Public votes:", json.dumps(dao.get_public_votes(proposal.proposal_id), indent=2))
-    print("Notifications:", json.dumps(dao.get_notifications(alice_wallet.address), indent=2))
-    print("Admin dashboard:", json.dumps(dao.admin_dashboard(alice_wallet.address), indent=2))
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="DAO Voting System demo and JSON import/export.")
+    parser.add_argument(
+        "--import-json",
+        dest="import_json",
+        help="Load DAO state from a JSON file (supports Python and HTML export formats).",
+    )
+    parser.add_argument(
+        "--export-json",
+        dest="export_json",
+        help="Save current DAO state to a JSON file.",
+    )
+    args = parser.parse_args()
+
+    if args.import_json:
+        dao = DAOVotingSystem.load_json(args.import_json)
+    else:
+        dao, _ = _build_demo_system()
+
+    proposal_id = next(iter(dao.proposals.keys()), None)
+    if proposal_id:
+        print("Results:", json.dumps(dao.get_results(proposal_id), indent=2))
+        print("Public votes:", json.dumps(dao.get_public_votes(proposal_id), indent=2))
+    else:
+        print("No proposals found.")
+
+    if args.export_json:
+        dao.save_json(args.export_json)
+        print(f"Saved DAO state to: {args.export_json}")

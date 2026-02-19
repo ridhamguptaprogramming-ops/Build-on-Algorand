@@ -1,5 +1,7 @@
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import tempfile
 
 from dao_voting import DAOVotingSystem, VoteBlock, VoteChoice, Wallet
 
@@ -190,6 +192,75 @@ class TestDAOVotingSystem(unittest.TestCase):
         dashboard = self.dao.admin_dashboard(self.alice.address)
         self.assertEqual(dashboard["total_members"], 3)
         self.assertGreaterEqual(dashboard["total_proposals"], 1)
+
+    def test_json_round_trip_export_import(self) -> None:
+        proposal_id = self._create_default_proposal()
+        vote_msg = self.dao.vote_message(proposal_id, VoteChoice.YES, token_weighted=True)
+        self.dao.cast_vote(
+            voter_address=self.bob.address,
+            proposal_id=proposal_id,
+            choice=VoteChoice.YES,
+            signature=self.bob.sign(vote_msg),
+            token_weighted=True,
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "dao_state.json"
+            self.dao.save_json(output_path)
+            restored = DAOVotingSystem.load_json(output_path)
+
+        restored_results = restored.get_results(proposal_id)
+        self.assertEqual(restored_results["yes_votes"], 1)
+        self.assertEqual(restored_results["yes_weight"], 3)
+        self.assertTrue(restored.verify_vote_integrity())
+
+    def test_import_html_style_json_structure(self) -> None:
+        html_style = {
+            "members": [
+                {
+                    "address": self.alice.address,
+                    "name": "Alice",
+                    "tokens": 10,
+                    "canCreate": True,
+                    "isAdmin": True,
+                    "privateKey": self.alice.private_key,
+                    "notifications": ["Welcome to the DAO."],
+                },
+                {
+                    "address": self.bob.address,
+                    "name": "Bob",
+                    "tokens": 3,
+                    "canCreate": True,
+                    "isAdmin": False,
+                    "privateKey": self.bob.private_key,
+                    "notifications": ["Welcome to the DAO."],
+                },
+            ],
+            "proposals": [
+                {
+                    "id": "P-0001",
+                    "title": "Web import proposal",
+                    "description": "Imported from HTML style JSON",
+                    "creator": self.alice.address,
+                    "createdAt": datetime.now(timezone.utc).isoformat(),
+                    "deadlineMs": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp() * 1000),
+                    "yesVotes": 0,
+                    "noVotes": 0,
+                    "yesWeight": 0,
+                    "noWeight": 0,
+                    "voters": [],
+                    "comments": [],
+                    "finalized": False,
+                }
+            ],
+            "ledger": self.dao.to_dict()["ledger"],
+            "proposalCounter": 1,
+        }
+
+        restored = DAOVotingSystem.from_dict(html_style)
+        self.assertIn("P-0001", restored.proposals)
+        self.assertEqual(restored.members[self.alice.address].display_name, "Alice")
+        self.assertTrue(restored.verify_vote_integrity())
 
 
 if __name__ == "__main__":

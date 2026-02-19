@@ -807,15 +807,17 @@
       const memberMap = new Map();
       for (const raw of rawMembers) {
         if (!raw || typeof raw !== "object") continue;
-        if (!raw.address || !raw.privateKey) continue;
-        memberMap.set(raw.address, {
-          address: String(raw.address),
-          privateKey: String(raw.privateKey),
-          name: String(raw.name || "Member"),
+        const address = String(raw.address || "").trim();
+        const privateKey = String(raw.privateKey || raw.private_key || "").trim();
+        if (!address || !privateKey) continue;
+        memberMap.set(address, {
+          address,
+          privateKey,
+          name: String(raw.name || raw.display_name || "Member"),
           tokens: Math.max(0, Number(raw.tokens) || 0),
-          canCreate: !!raw.canCreate,
-          isAdmin: !!raw.isAdmin,
-          joinedAt: String(raw.joinedAt || nowIso()),
+          canCreate: raw.canCreate === undefined ? !!raw.can_create_proposals : !!raw.canCreate,
+          isAdmin: raw.isAdmin === undefined ? !!raw.is_admin : !!raw.isAdmin,
+          joinedAt: String(raw.joinedAt || raw.joined_at || nowIso()),
           notifications: Array.isArray(raw.notifications) ? raw.notifications.map(String) : [],
         });
       }
@@ -823,25 +825,37 @@
       const proposalMap = new Map();
       for (const raw of rawProposals) {
         if (!raw || typeof raw !== "object") continue;
-        if (!raw.id) continue;
-        const voters = Array.isArray(raw.voters) ? new Set(raw.voters.map(String)) : new Set();
+        const proposalId = String(raw.id || raw.proposal_id || "").trim();
+        if (!proposalId) continue;
+
+        const votersRaw = Array.isArray(raw.voters)
+          ? raw.voters
+          : (Array.isArray(raw.voted_addresses) ? raw.voted_addresses : []);
+        const voters = new Set(votersRaw.map(String));
         const comments = Array.isArray(raw.comments) ? raw.comments : [];
-        proposalMap.set(String(raw.id), {
-          id: String(raw.id),
+
+        let deadlineMs = Number(raw.deadlineMs);
+        if (!Number.isFinite(deadlineMs)) {
+          const parsed = Date.parse(String(raw.deadline || ""));
+          deadlineMs = Number.isFinite(parsed) ? parsed : Date.now();
+        }
+
+        proposalMap.set(proposalId, {
+          id: proposalId,
           title: String(raw.title || "Untitled Proposal"),
           description: String(raw.description || ""),
           creator: String(raw.creator || ""),
-          createdAt: String(raw.createdAt || nowIso()),
-          deadlineMs: Number(raw.deadlineMs) || Date.now(),
-          yesVotes: Number(raw.yesVotes) || 0,
-          noVotes: Number(raw.noVotes) || 0,
-          yesWeight: Number(raw.yesWeight) || 0,
-          noWeight: Number(raw.noWeight) || 0,
+          createdAt: String(raw.createdAt || raw.created_at || nowIso()),
+          deadlineMs,
+          yesVotes: Number(raw.yesVotes ?? raw.yes_votes) || 0,
+          noVotes: Number(raw.noVotes ?? raw.no_votes) || 0,
+          yesWeight: Number(raw.yesWeight ?? raw.yes_weight) || 0,
+          noWeight: Number(raw.noWeight ?? raw.no_weight) || 0,
           voters,
           comments: comments.map((c) => ({
             author: String(c.author || ""),
             text: String(c.text || ""),
-            createdAt: String(c.createdAt || nowIso()),
+            createdAt: String(c.createdAt || c.created_at || nowIso()),
           })),
           finalized: !!raw.finalized,
         });
@@ -859,12 +873,13 @@
         const n = Number(String(id).replace("P-", ""));
         return Number.isFinite(n) ? Math.max(max, n) : max;
       }, 0);
-      const savedCounter = Number(data.proposalCounter);
+      const savedCounter = Number(data.proposalCounter ?? data.proposal_counter);
       state.proposalCounter = Number.isFinite(savedCounter) && savedCounter > 0
         ? Math.floor(savedCounter)
         : maxProposalNumber + 1;
 
-      const savedActive = typeof data.activeWallet === "string" ? data.activeWallet : null;
+      const candidateActive = data.activeWallet ?? data.active_wallet;
+      const savedActive = typeof candidateActive === "string" ? candidateActive : null;
       state.activeWallet = savedActive && state.members.has(savedActive) ? savedActive : null;
       if (!state.activeWallet && state.members.size) {
         state.activeWallet = Array.from(state.members.keys())[0];
